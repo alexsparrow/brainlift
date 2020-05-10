@@ -1,6 +1,5 @@
-
 use cranelift::prelude::*;
-use cranelift_module::{Linkage, Module, FuncId};
+use cranelift_module::{FuncId, Linkage, Module};
 use cranelift_simplejit::{SimpleJITBackend, SimpleJITBuilder};
 
 fn putc(a: u8) -> u8 {
@@ -9,21 +8,24 @@ fn putc(a: u8) -> u8 {
 }
 
 fn getc() -> u8 {
-   let mut buf = String::new();
+    let mut buf = String::new();
     std::io::stdin().read_line(&mut buf);
     return buf.chars().nth(0).expect("No input") as u8;
 }
 
 struct State<'a> {
     memory: &'a Value,
-    pos: &'a Value
+    pos: &'a Value,
 }
 
 fn mem_read(builder: &mut FunctionBuilder, state: &State, int: Type, int8: Type) -> (Value, Value) {
     let p = builder.ins().load(int8, MemFlags::new(), *state.pos, 0);
     let p_large = builder.ins().uextend(int, p);
     let mem_addr = builder.ins().iadd(*state.memory, p_large);
-    return (mem_addr, builder.ins().load(int8, MemFlags::new(), mem_addr, 0));
+    return (
+        mem_addr,
+        builder.ins().load(int8, MemFlags::new(), mem_addr, 0),
+    );
 }
 
 pub struct JIT {
@@ -33,7 +35,7 @@ pub struct JIT {
     putc: FuncId,
     getc: FuncId,
     int: Type,
-    int8: Type
+    int8: Type,
 }
 
 impl JIT {
@@ -49,15 +51,15 @@ impl JIT {
         sig_putc.returns.push(AbiParam::new(types::I8));
 
         let putc = module
-        .declare_function("putc", Linkage::Import, &sig_putc)
-        .unwrap();
+            .declare_function("putc", Linkage::Import, &sig_putc)
+            .unwrap();
 
         let mut sig_getc = module.make_signature();
         sig_getc.returns.push(AbiParam::new(types::I8));
 
         let getc = module
-        .declare_function("getc", Linkage::Import, &sig_getc)
-        .unwrap();
+            .declare_function("getc", Linkage::Import, &sig_getc)
+            .unwrap();
 
         let int = module.target_config().pointer_type();
         let int8 = Type::int(8).expect("oops");
@@ -69,20 +71,23 @@ impl JIT {
             putc,
             getc,
             int,
-            int8
+            int8,
         }
     }
 
     fn print_ir(&self) {
         let mut buf = String::new();
-        cranelift::codegen::write_function(&mut buf, &self.ctx.func, &cranelift::codegen::ir::function::DisplayFunctionAnnotations::default())
-            .expect("Oops");
+        cranelift::codegen::write_function(
+            &mut buf,
+            &self.ctx.func,
+            &cranelift::codegen::ir::function::DisplayFunctionAnnotations::default(),
+        )
+        .expect("Oops");
         println!("{}", buf);
     }
 
     pub fn compile(&mut self, input: &str) -> Result<*const u8, String> {
-        self.translate(input)
-            .map_err(|e| e.to_string())?;
+        self.translate(input).map_err(|e| e.to_string())?;
 
         self.print_ir();
 
@@ -103,20 +108,24 @@ impl JIT {
         Ok(code)
     }
 
-    fn translate(
-        &mut self,
-        s: &str,
-    ) -> Result<(), String> {
-
-        let putc = self.module.declare_func_in_func(self.putc, &mut self.ctx.func);
-        let getc = self.module.declare_func_in_func(self.getc, &mut self.ctx.func);
+    fn translate(&mut self, s: &str) -> Result<(), String> {
+        let putc = self
+            .module
+            .declare_func_in_func(self.putc, &mut self.ctx.func);
+        let getc = self
+            .module
+            .declare_func_in_func(self.getc, &mut self.ctx.func);
 
         // Pointer to memory array
         self.ctx.func.signature.params.push(AbiParam::new(self.int));
         // Pointer to current memory address
         self.ctx.func.signature.params.push(AbiParam::new(self.int));
         // Arbitrary return value
-        self.ctx.func.signature.returns.push(AbiParam::new(self.int));
+        self.ctx
+            .func
+            .signature
+            .returns
+            .push(AbiParam::new(self.int));
 
         let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
         let entry_block = builder.create_block();
@@ -127,15 +136,24 @@ impl JIT {
         let pos: Variable = Variable::new(1);
         builder.declare_var(memory, self.int);
         builder.declare_var(pos, self.int);
-        builder.def_var(memory, *builder.block_params(entry_block).first().expect("Oops"));
-        builder.def_var(pos, *builder.block_params(entry_block).get(1).expect("Oops"));
+        builder.def_var(
+            memory,
+            *builder.block_params(entry_block).first().expect("Oops"),
+        );
+        builder.def_var(
+            pos,
+            *builder.block_params(entry_block).get(1).expect("Oops"),
+        );
         builder.seal_block(entry_block);
 
         let mut pc = 0;
         let memory_val = builder.use_var(memory);
         let pos_val = builder.use_var(pos);
 
-        let state = State { memory: &memory_val, pos: &pos_val };
+        let state = State {
+            memory: &memory_val,
+            pos: &pos_val,
+        };
         let mut stack: Vec<(Block, Block)> = Vec::new();
 
         while pc < s.len() {
@@ -145,22 +163,22 @@ impl JIT {
                     let (addr, value) = mem_read(&mut builder, &state, self.int, self.int8);
                     let o = builder.ins().iadd_imm(value, 1);
                     builder.ins().store(MemFlags::new(), o, addr, 0);
-                },
+                }
                 '-' => {
                     let (addr, value) = mem_read(&mut builder, &state, self.int, self.int8);
                     let o = builder.ins().iadd_imm(value, -1);
                     builder.ins().store(MemFlags::new(), o, addr, 0);
-                },
+                }
                 '>' => {
                     let p = builder.ins().load(self.int8, MemFlags::new(), pos_val, 0);
                     let new_p = builder.ins().iadd_imm(p, 1);
                     builder.ins().store(MemFlags::new(), new_p, pos_val, 0);
-                },
+                }
                 '<' => {
                     let p = builder.ins().load(self.int8, MemFlags::new(), pos_val, 0);
                     let new_p = builder.ins().iadd_imm(p, -1);
                     builder.ins().store(MemFlags::new(), new_p, pos_val, 0);
-                },
+                }
                 '[' => {
                     let header_block = builder.create_block();
                     let current_block = builder.create_block();
@@ -176,7 +194,7 @@ impl JIT {
                     builder.seal_block(current_block);
                     builder.seal_block(exit_block);
                     stack.push((header_block, exit_block));
-                },
+                }
                 ']' => {
                     let (header_block, exit_block) = stack.pop().expect("Unbalanced loop");
                     builder.ins().jump(header_block, &[]);
@@ -188,11 +206,11 @@ impl JIT {
 
                     builder.seal_block(current_block);
                     builder.switch_to_block(current_block);
-                },
+                }
                 '.' => {
                     let (_, value) = mem_read(&mut builder, &state, self.int, self.int8);
                     builder.ins().call(putc, &[value]);
-                },
+                }
                 ',' => {
                     let p = builder.ins().load(self.int8, MemFlags::new(), pos_val, 0);
                     let p_large = builder.ins().uextend(self.int, p);
@@ -205,8 +223,8 @@ impl JIT {
                         results[0].clone()
                     };
                     builder.ins().store(MemFlags::new(), value, mem_addr, 0);
-                },
-                _ => ()
+                }
+                _ => (),
             }
             pc += 1
         }
@@ -217,4 +235,3 @@ impl JIT {
         Ok(())
     }
 }
-
