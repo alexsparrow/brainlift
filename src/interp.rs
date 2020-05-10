@@ -1,5 +1,5 @@
 
-fn brainfuck(input: &String) {
+fn brainfuck(input: &str) {
     let mut branches: Vec<usize> = Vec::new();
     let mut mem: [u8; 1024] = [0; 1024];
     let mut pos: usize = 0;

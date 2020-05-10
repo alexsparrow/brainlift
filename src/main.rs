@@ -5,15 +5,13 @@ use std::mem;
 mod jit;
 mod interp;
 
-fn brainfuck_jit(input: &String) {
+fn brainfuck_jit(input: &str) {
     let mut mem: [u8; 1024] = [0; 1024];
     let mut pos: usize = 0;
     let mut j = jit::JIT::new();
     let f= j.compile(input).expect("Wat");
     let func = unsafe { mem::transmute::<_, fn(&mut [u8; 1024], &mut usize) -> isize>(f) };
-    println!("Pos: {}", pos);
-    println!("Result: {}", func(&mut mem, &mut pos));
-    println!("Pos: {}", pos);
+    func(&mut mem, &mut pos);
     memory_dmp(&mem);
 }
 
@@ -39,10 +37,15 @@ fn main() {
 
 #[test]
 fn basic() {
-    brainfuck_jit(&String::from("+>"));
+    brainfuck_jit("+>");
 }
 
 #[test]
 fn wile() {
-    brainfuck_jit(&String::from(">+++++[<+>-]"));
+    brainfuck_jit(">+++++[<+>-].");
+}
+
+#[test]
+fn hello_world() {
+    brainfuck_jit("++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.");
 }

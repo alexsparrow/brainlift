@@ -1,22 +1,42 @@
 
 use cranelift::prelude::*;
-use cranelift_module::{Linkage, Module};
+use cranelift_module::{Linkage, Module, FuncId};
 use cranelift_simplejit::{SimpleJITBackend, SimpleJITBuilder};
+
+fn putc(a: u8) -> u8 {
+    print!("{}", a as char);
+    a
+}
 
 pub struct JIT {
     builder_context: FunctionBuilderContext,
     ctx: codegen::Context,
     module: Module<SimpleJITBackend>,
+    putc: FuncId
 }
 
 impl JIT {
     pub fn new() -> Self {
-        let builder = SimpleJITBuilder::new(cranelift_module::default_libcall_names());
-        let module = Module::new(builder);
+        let putc_addr: *const u8 = putc as *const u8;
+
+        let mut builder = SimpleJITBuilder::new(cranelift_module::default_libcall_names());
+        builder.symbol("putc", putc_addr);
+
+        let mut module = Module::new(builder);
+
+        let mut sig_a = module.make_signature();
+        sig_a.params.push(AbiParam::new(types::I8));
+        sig_a.returns.push(AbiParam::new(types::I8));
+
+        let func_a = module
+        .declare_function("putc", Linkage::Import, &sig_a)
+        .unwrap();
+
         Self {
             builder_context: FunctionBuilderContext::new(),
             ctx: module.make_context(),
             module,
+            putc: func_a
         }
     }
 
@@ -56,6 +76,8 @@ impl JIT {
     ) -> Result<(), String> {
         let int = self.module.target_config().pointer_type();
         let int8 = Type::int(8).expect("oops");
+
+        let putc = self.module.declare_func_in_func(self.putc, &mut self.ctx.func);
 
         // Pointer to memory array
         self.ctx.func.signature.params.push(AbiParam::new(int));
@@ -142,7 +164,14 @@ impl JIT {
 
                     builder.seal_block(current_block);
                     builder.switch_to_block(current_block);
-                }
+                },
+                '.' => {
+                    let p = builder.ins().load(int8, MemFlags::new(), pos_val, 0);
+                    let p_large = builder.ins().uextend(int, p);
+                    let mem_addr = builder.ins().iadd(memory_val, p_large);
+                    let v = builder.ins().load(int8, MemFlags::new(), mem_addr, 0);
+                    builder.ins().call(putc, &[v]);
+                },
                 _ => ()
             }
             pc += 1
