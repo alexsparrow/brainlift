@@ -1,17 +1,9 @@
+use crate::stdlib::{getc, putc};
+use cranelift::codegen::ir::function::DisplayFunctionAnnotations;
+use cranelift::codegen::write_function;
 use cranelift::prelude::*;
-use cranelift_module::{FuncId, Linkage, Module};
+use cranelift_module::{default_libcall_names, FuncId, Linkage, Module};
 use cranelift_simplejit::{SimpleJITBackend, SimpleJITBuilder};
-
-fn putc(a: u8) -> u8 {
-    print!("{}", a as char);
-    a
-}
-
-fn getc() -> u8 {
-    let mut buf = String::new();
-    std::io::stdin().read_line(&mut buf);
-    return buf.chars().nth(0).expect("No input") as u8;
-}
 
 struct State<'a> {
     memory: &'a Value,
@@ -40,7 +32,7 @@ pub struct JIT {
 
 impl JIT {
     pub fn new() -> Self {
-        let mut builder = SimpleJITBuilder::new(cranelift_module::default_libcall_names());
+        let mut builder = SimpleJITBuilder::new(default_libcall_names());
         builder.symbol("putc", putc as *const u8);
         builder.symbol("getc", getc as *const u8);
 
@@ -77,10 +69,10 @@ impl JIT {
 
     fn print_ir(&self) {
         let mut buf = String::new();
-        cranelift::codegen::write_function(
+        write_function(
             &mut buf,
             &self.ctx.func,
-            &cranelift::codegen::ir::function::DisplayFunctionAnnotations::default(),
+            &DisplayFunctionAnnotations::default(),
         )
         .expect("Oops");
         println!("{}", buf);

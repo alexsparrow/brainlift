@@ -1,3 +1,5 @@
+use crate::stdlib::{getc, putc};
+
 pub fn brainfuck(input: &str) {
     let mut branches: Vec<usize> = Vec::new();
     let mut mem: [u8; 1024] = [0; 1024];
@@ -31,11 +33,11 @@ pub fn brainfuck(input: &str) {
                     branches.pop().expect("Unbalanced delimiter");
                 }
             }
-            '.' => print!("{}", mem[pos] as char),
+            '.' => {
+                putc(mem[pos]);
+            }
             ',' => {
-                let mut buf = String::new();
-                std::io::stdin().read_line(&mut buf);
-                mem[pos] = buf.chars().nth(0).expect("No input") as u8;
+                mem[pos] = getc();
             }
             _ => (),
         }

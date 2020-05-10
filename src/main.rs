@@ -5,6 +5,7 @@ use std::mem;
 
 mod interp;
 mod jit;
+mod stdlib;
 
 extern crate test;
 use test::Bencher;
