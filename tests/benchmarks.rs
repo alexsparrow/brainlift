@@ -4,12 +4,13 @@ use test::Bencher;
 use brainlift::jit::{brainfuck_jit, brainfuck_jit_compile, brainfuck_jit_run};
 use brainlift::state::BrainfuckState;
 use brainlift::interp::{brainfuck};
+use brainlift::stdlib::DefaultStdLib;
 
 const HELLO_WORLD_SRC: &str = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.";
 
 #[bench]
 fn jit_precompile(b: &mut Bencher) {
-    let f = brainfuck_jit_compile(HELLO_WORLD_SRC);
+    let f = brainfuck_jit_compile(HELLO_WORLD_SRC, &mut DefaultStdLib {});
     b.iter(|| brainfuck_jit_run(f, &mut BrainfuckState::new()));
 }
 

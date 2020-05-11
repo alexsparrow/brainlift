@@ -1,13 +1,13 @@
 use crate::{
     state::BrainfuckState,
-    stdlib::{getc, putc},
+    stdlib::{DefaultStdLib, StdLib},
 };
 
 pub fn brainfuck(input: &str) {
-    brainfuck_state(input, &mut BrainfuckState::new());
+    brainfuck_state(input, &mut DefaultStdLib {}, &mut BrainfuckState::new());
 }
 
-pub fn brainfuck_state(input: &str, state: &mut BrainfuckState) {
+pub fn brainfuck_state<T: StdLib>(input: &str, stdlib: &mut T, state: &mut BrainfuckState) {
     let mut branches: Vec<usize> = Vec::new();
     let mut pc = 0;
 
@@ -45,10 +45,10 @@ pub fn brainfuck_state(input: &str, state: &mut BrainfuckState) {
                 }
             }
             '.' => {
-                putc(state.mem[state.pos]);
+                stdlib.putc(state.mem[state.pos]);
             }
             ',' => {
-                state.mem[state.pos] = getc();
+                state.mem[state.pos] = stdlib.getc();
             }
             _ => (),
         }

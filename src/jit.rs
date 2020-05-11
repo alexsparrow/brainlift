@@ -1,5 +1,5 @@
 use crate::state::BrainfuckState;
-use crate::stdlib::{getc, putc};
+use crate::stdlib::{getc, putc, DefaultStdLib, StdLib};
 use cranelift::codegen::ir::function::DisplayFunctionAnnotations;
 use cranelift::codegen::write_function;
 use cranelift::prelude::*;
@@ -22,7 +22,7 @@ fn mem_read(builder: &mut FunctionBuilder, state: &State, int: Type, int8: Type)
     );
 }
 
-pub struct JIT {
+pub struct JIT<'a, T: StdLib> {
     builder_context: FunctionBuilderContext,
     ctx: codegen::Context,
     module: Module<SimpleJITBackend>,
@@ -30,17 +30,21 @@ pub struct JIT {
     getc: FuncId,
     int: Type,
     int8: Type,
+    stdlib: &'a T,
 }
 
-impl JIT {
-    pub fn new() -> Self {
+impl<'a, T: StdLib> JIT<'a, T> {
+    pub fn new(stdlib: &'a T) -> Self {
         let mut builder = SimpleJITBuilder::new(default_libcall_names());
-        builder.symbol("putc", putc as *const u8);
-        builder.symbol("getc", getc as *const u8);
+        builder.symbol("putc", putc::<T> as *const u8);
+        builder.symbol("getc", getc::<T> as *const u8);
 
         let mut module = Module::new(builder);
 
         let mut sig_putc = module.make_signature();
+        sig_putc
+            .params
+            .push(AbiParam::new(module.target_config().pointer_type()));
         sig_putc.params.push(AbiParam::new(types::I8));
         sig_putc.returns.push(AbiParam::new(types::I8));
 
@@ -49,6 +53,9 @@ impl JIT {
             .unwrap();
 
         let mut sig_getc = module.make_signature();
+        sig_getc
+            .params
+            .push(AbiParam::new(module.target_config().pointer_type()));
         sig_getc.returns.push(AbiParam::new(types::I8));
 
         let getc = module
@@ -66,6 +73,7 @@ impl JIT {
             getc,
             int,
             int8,
+            stdlib,
         }
     }
 
@@ -203,19 +211,26 @@ impl JIT {
                 }
                 '.' => {
                     let (_, value) = mem_read(&mut builder, &state, self.int, self.int8);
-                    builder.ins().call(putc, &[value]);
+                    let stdlib_ptr = builder
+                        .ins()
+                        .iconst(self.int, self.stdlib as *const _ as i64);
+                    builder.ins().call(putc, &[stdlib_ptr, value]);
                 }
                 ',' => {
                     let p = builder.ins().load(self.int8, MemFlags::new(), pos_val, 0);
                     let p_large = builder.ins().uextend(self.int, p);
                     let mem_addr = builder.ins().iadd(memory_val, p_large);
 
-                    let call = builder.ins().call(getc, &[]);
+                    let stdlib_ptr = builder
+                        .ins()
+                        .iconst(self.int, self.stdlib as *const _ as i64);
+                    let call = builder.ins().call(getc, &[stdlib_ptr]);
                     let value = {
                         let results = builder.inst_results(call);
                         assert_eq!(results.len(), 1);
                         results[0].clone()
                     };
+
                     builder.ins().store(MemFlags::new(), value, mem_addr, 0);
                 }
                 _ => (),
@@ -235,8 +250,8 @@ pub struct BrainfuckJITFunction {
     f: *const u8,
 }
 
-pub fn brainfuck_jit_compile(input: &str) -> BrainfuckJITFunction {
-    let mut j = JIT::new();
+pub fn brainfuck_jit_compile<T: StdLib>(input: &str, stdlib: &T) -> BrainfuckJITFunction {
+    let mut j = JIT::new(stdlib);
     return BrainfuckJITFunction {
         f: j.compile(input).expect("Wat"),
     };
@@ -247,11 +262,11 @@ pub fn brainfuck_jit_run(func: BrainfuckJITFunction, state: &mut BrainfuckState)
     func(&mut state.mem, &mut state.pos);
 }
 
-pub fn brainfuck_jit_state(input: &str, state: &mut BrainfuckState) {
-    let f = brainfuck_jit_compile(input);
+pub fn brainfuck_jit_state<T: StdLib>(input: &str, stdlib: &mut T, state: &mut BrainfuckState) {
+    let f = brainfuck_jit_compile(input, stdlib);
     brainfuck_jit_run(f, state);
 }
 
 pub fn brainfuck_jit(input: &str) {
-    brainfuck_jit_state(input, &mut BrainfuckState::new());
+    brainfuck_jit_state(input, &mut DefaultStdLib {}, &mut BrainfuckState::new());
 }
