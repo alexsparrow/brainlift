@@ -8,17 +8,10 @@ mod state;
 mod stdlib;
 
 extern crate test;
-use jit::{brainfuck_jit, brainfuck_jit_compile, brainfuck_jit_run};
+use interp::brainfuck_state;
+use jit::{brainfuck_jit, brainfuck_jit_compile, brainfuck_jit_run, brainfuck_jit_state};
 use state::BrainfuckState;
 use test::Bencher;
-
-fn memory_dmp(mem: &[u8; 1024]) {
-    for i in 0..1024 {
-        if mem[i] > 0 {
-            println!("{:04}| {}", i, mem[i]);
-        }
-    }
-}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -44,7 +37,13 @@ const HELLO_WORLD_SRC: &str = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]
 
 #[test]
 fn hello_world() {
-    brainfuck_jit(HELLO_WORLD_SRC);
+    let mut state1 = BrainfuckState::new();
+    brainfuck_jit_state(HELLO_WORLD_SRC, &mut state1);
+
+    let mut state2 = BrainfuckState::new();
+    brainfuck_state(HELLO_WORLD_SRC, &mut state2);
+
+    state1.assert_eq(&state2);
 }
 
 #[test]

@@ -1,21 +1,26 @@
-use crate::stdlib::{getc, putc};
+use crate::{
+    state::BrainfuckState,
+    stdlib::{getc, putc},
+};
 
 pub fn brainfuck(input: &str) {
+    brainfuck_state(input, &mut BrainfuckState::new());
+}
+
+pub fn brainfuck_state(input: &str, state: &mut BrainfuckState) {
     let mut branches: Vec<usize> = Vec::new();
-    let mut mem: [u8; 1024] = [0; 1024];
-    let mut pos: usize = 0;
     let mut pc = 0;
 
     while pc < input.len() {
         let c = input.chars().nth(pc).expect("Out of range");
         match c {
-            '+' => mem[pos] += 1,
-            '-' => mem[pos] -= 1,
-            '>' => pos += 1,
-            '<' => pos -= 1,
+            '+' => state.mem[state.pos] += 1,
+            '-' => state.mem[state.pos] -= 1,
+            '>' => state.pos += 1,
+            '<' => state.pos -= 1,
             '[' => {
                 branches.push(pc);
-                if mem[pos] == 0 {
+                if state.mem[state.pos] == 0 {
                     let mut stack_depth = 1;
                     loop {
                         pc += 1;
@@ -33,17 +38,17 @@ pub fn brainfuck(input: &str) {
                 }
             }
             ']' => {
-                if mem[pos] != 0 {
+                if state.mem[state.pos] != 0 {
                     pc = *branches.last().expect("Unbalanced delimiter");
                 } else {
                     branches.pop().expect("Unbalanced delimiter");
                 }
             }
             '.' => {
-                putc(mem[pos]);
+                putc(state.mem[state.pos]);
             }
             ',' => {
-                mem[pos] = getc();
+                state.mem[state.pos] = getc();
             }
             _ => (),
         }
