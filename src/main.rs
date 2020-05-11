@@ -62,6 +62,11 @@ fn hello_world() {
     brainfuck_jit(HELLO_WORLD_SRC);
 }
 
+#[test]
+fn nested_loop() {
+    interp::brainfuck("+[>[+-]<-]");
+}
+
 #[bench]
 fn jit_precompile(b: &mut Bencher) {
     let f = brainfuck_jit_compile(HELLO_WORLD_SRC);

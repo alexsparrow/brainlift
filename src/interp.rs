@@ -16,12 +16,18 @@ pub fn brainfuck(input: &str) {
             '[' => {
                 branches.push(pc);
                 if mem[pos] == 0 {
+                    let mut stack_depth = 1;
                     loop {
                         pc += 1;
-                        let scan = input.chars().nth(pc).expect("Out of range");
-
-                        if scan == ']' {
-                            break;
+                        match input.chars().nth(pc).expect("Out of range") {
+                            '[' => stack_depth += 1,
+                            ']' => {
+                                stack_depth -= 1;
+                                if stack_depth == 0 {
+                                    break;
+                                }
+                            },
+                            _ => ()
                         }
                     }
                 }
