@@ -1,9 +1,11 @@
+use crate::state::BrainfuckState;
 use crate::stdlib::{getc, putc};
 use cranelift::codegen::ir::function::DisplayFunctionAnnotations;
 use cranelift::codegen::write_function;
 use cranelift::prelude::*;
 use cranelift_module::{default_libcall_names, FuncId, Linkage, Module};
 use cranelift_simplejit::{SimpleJITBackend, SimpleJITBuilder};
+use std::mem;
 
 struct State<'a> {
     memory: &'a Value,
@@ -226,4 +228,30 @@ impl JIT {
         builder.finalize();
         Ok(())
     }
+}
+
+#[derive(Copy, Clone)]
+pub struct BrainfuckJITFunction {
+    f: *const u8,
+}
+
+pub fn brainfuck_jit_compile(input: &str) -> BrainfuckJITFunction {
+    let mut j = JIT::new();
+    return BrainfuckJITFunction {
+        f: j.compile(input).expect("Wat"),
+    };
+}
+
+pub fn brainfuck_jit_run(func: BrainfuckJITFunction, state: &mut BrainfuckState) {
+    let func = unsafe { mem::transmute::<_, fn(&mut [u8; 1024], &mut usize) -> isize>(func.f) };
+    func(&mut state.mem, &mut state.pos);
+}
+
+pub fn brainfuck_jit_state(input: &str, state: &mut BrainfuckState) {
+    let f = brainfuck_jit_compile(input);
+    brainfuck_jit_run(f, state);
+}
+
+pub fn brainfuck_jit(input: &str) {
+    brainfuck_jit_state(input, &mut BrainfuckState::new());
 }

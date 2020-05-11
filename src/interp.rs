@@ -26,8 +26,8 @@ pub fn brainfuck(input: &str) {
                                 if stack_depth == 0 {
                                     break;
                                 }
-                            },
-                            _ => ()
+                            }
+                            _ => (),
                         }
                     }
                 }
