@@ -1,11 +1,19 @@
 use crate::state::BrainfuckState;
-use crate::stdlib::{getc, putc, DefaultStdLib, StdLib};
+use crate::stdlib::{DefaultStdLib, StdLib};
 use cranelift::codegen::ir::function::DisplayFunctionAnnotations;
 use cranelift::codegen::write_function;
 use cranelift::prelude::*;
 use cranelift_module::{default_libcall_names, FuncId, Linkage, Module};
 use cranelift_simplejit::{SimpleJITBackend, SimpleJITBuilder};
 use std::mem;
+
+fn putc<T: StdLib>(stdlib: *mut T, a: u8) -> u8 {
+    return unsafe { stdlib.as_mut().expect("OOPS").putc(a) };
+}
+
+fn getc<T: StdLib>(stdlib: *mut T) -> u8 {
+    return unsafe { stdlib.as_mut().expect("OOPS").getc() };
+}
 
 struct State<'a> {
     memory: &'a Value,

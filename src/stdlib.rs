@@ -1,13 +1,5 @@
 use std::io::stdin;
 
-pub fn putc<T: StdLib>(stdlib: *mut T, a: u8) -> u8 {
-    return unsafe { stdlib.as_mut().expect("OOPS").putc(a) };
-}
-
-pub fn getc<T: StdLib>(stdlib: *mut T) -> u8 {
-    return unsafe { stdlib.as_mut().expect("OOPS").getc() };
-}
-
 pub trait StdLib {
     fn getc(&mut self) -> u8;
     fn putc(&mut self, c: u8) -> u8;
